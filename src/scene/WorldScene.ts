@@ -9,6 +9,7 @@ export class WorldScene {
   private isSoftwareGl: boolean = false;
   private animFrameId: number = 0;
   private clock: THREE.Clock;
+  private currentStage: TaskStage = 'godown';
 
   // Camera targets
   private targetCamPos = new THREE.Vector3(-25, 9, 18);
@@ -83,10 +84,11 @@ export class WorldScene {
     this.scene.background = new THREE.Color(0x7dd3fc); // Calm cheerful sky
     this.scene.fog = new THREE.Fog(0x7dd3fc, 50, 160);
 
-    // 3. Camera with 0.5 near-plane for rock-solid 24-bit depth precision (no Z-fighting)
+    // 3. Camera with aspect-aware responsive FOV
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 220);
+    this.updateCamera();
     this.camera.position.copy(this.currentCamPos);
     this.camera.lookAt(this.currentLookAt);
 
@@ -119,6 +121,29 @@ export class WorldScene {
 
     this.startLoop();
     window.addEventListener('resize', this.onResize);
+  }
+
+  // Responsive camera FOV calculation keeping mobile portrait view fully framed
+  private updateCamera() {
+    if (!this.container) return;
+    const width = this.container.clientWidth || window.innerWidth;
+    const height = this.container.clientHeight || window.innerHeight;
+    const aspect = width / height;
+    this.camera.aspect = aspect;
+
+    if (aspect < 1.0) {
+      // Mobile portrait mode: adjust vertical FOV to preserve wide horizontal coverage
+      // Desired horizontal FOV ~62 degrees so vehicles are completely visible on phones
+      const targetHFov = (62 * Math.PI) / 180;
+      const vFov = 2 * Math.atan(Math.tan(targetHFov / 2) / aspect);
+      this.camera.fov = Math.min(78, (vFov * 180) / Math.PI);
+    } else {
+      this.camera.fov = 45;
+    }
+    this.camera.updateProjectionMatrix();
+    if (this.renderer) {
+      this.renderer.setSize(width, height);
+    }
   }
 
   private setupLighting() {
@@ -776,9 +801,9 @@ export class WorldScene {
       craneGroup.add(leg);
     });
 
-    // Boom arm extending out over water & ship
-    const boom = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 2.2), craneMat);
-    boom.position.set(5, 14.5, 0);
+    // Boom arm extending out over quay (x = 0) all the way across to ship hold (x = 16)
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(26, 1.2, 2.2), craneMat);
+    boom.position.set(8, 14.5, 0);
     boom.castShadow = !this.isSoftwareGl;
     craneGroup.add(boom);
 
@@ -787,11 +812,11 @@ export class WorldScene {
     cab.position.set(0, 13.2, 0);
     craneGroup.add(cab);
 
-    // Trolley & Spreader
+    // Trolley & Spreader (Travels along boom from Quay x = 0 to Ship Hold x = 16)
     this.craneTrolley = new THREE.Group();
     this.craneTrolley.position.set(0, 13.8, 0);
 
-    const trolleyMesh = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 2.0), darkMat);
+    const trolleyMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 2.2), darkMat);
     this.craneTrolley.add(trolleyMesh);
 
     this.craneSpreader = new THREE.Group();
@@ -804,18 +829,34 @@ export class WorldScene {
     this.craneSpreader.add(spreaderBar);
 
     this.craneHeldContainer = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 1.4, 1.4),
-      new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 }) // Blue Container
+      new THREE.BoxGeometry(3.2, 1.3, 1.5),
+      new THREE.MeshStandardMaterial({
+        color: 0x2563eb,
+        roughness: 0.4,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      }) // Blue Container
     );
-    this.craneHeldContainer.position.y = -0.9;
+    this.craneHeldContainer.position.y = -0.85;
     this.craneHeldContainer.castShadow = !this.isSoftwareGl;
     this.craneSpreader.add(this.craneHeldContainer);
 
     this.craneTrolley.add(this.craneSpreader);
     craneGroup.add(this.craneTrolley);
+
+    // Container Quay Transfer Pad directly underneath the crane trolley at x = 0
+    const quayPad = new THREE.Mesh(
+      new THREE.BoxGeometry(4.2, 0.08, 2.6),
+      new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 })
+    );
+    quayPad.position.set(0, 0.04, 0);
+    quayPad.receiveShadow = !this.isSoftwareGl;
+    harborZone.add(quayPad);
+
     harborZone.add(craneGroup);
 
-    // OVERSEAS CARGO SHIP
+    // OVERSEAS CARGO SHIP (Berth centered at x = 16, z = 0 in harborZone, world x = 44)
     this.shipGroup = new THREE.Group();
     this.shipGroup.position.set(16, -0.2, 0);
 
@@ -823,22 +864,30 @@ export class WorldScene {
     const bootMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
     const deckMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
 
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(10, 3.2, 24), hullMat);
-    hull.position.y = 0.6;
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(9.8, 3.2, 23.6), hullMat);
+    hull.position.y = 0.7;
     hull.castShadow = !this.isSoftwareGl;
 
     const bow = new THREE.Mesh(
-      new THREE.CylinderGeometry(5.0, 4.2, 3.2, 4, 1, false, 0, Math.PI),
+      new THREE.CylinderGeometry(4.9, 4.0, 3.2, 4, 1, false, 0, Math.PI),
       hullMat
     );
     bow.rotation.y = -Math.PI / 2;
-    bow.position.set(0, 0.6, 12);
+    bow.position.set(0, 0.7, 11.8);
 
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.4, 24.2), bootMat);
-    stripe.position.y = -0.6;
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(9.9, 0.4, 23.7), bootMat);
+    stripe.position.y = -0.4; // Cleanly above water level
 
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.2, 23.6), deckMat);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.2, 23.4), deckMat);
     deck.position.y = 2.25;
+
+    // Steel cell guide rails on deck for containers (prevents deck coplanar contact)
+    const cellGuides = new THREE.Mesh(
+      new THREE.BoxGeometry(6.6, 0.08, 14.8),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
+    );
+    cellGuides.position.set(0, 2.39, 2);
+    this.shipGroup.add(cellGuides);
 
     // Bridge / Wheelhouse
     const bridge = new THREE.Group();
@@ -864,9 +913,9 @@ export class WorldScene {
 
     bridge.add(bridgeLower, bridgeUpper, funnel);
 
-    // Stacks of containers on ship deck
+    // Stacks of containers on ship deck (positioned cleanly above deck and rails at y = 2.46)
     this.shipContainersGroup = new THREE.Group();
-    this.shipContainersGroup.position.set(0, 2.35, 2);
+    this.shipContainersGroup.position.set(0, 2.46, 2);
 
     this.shipGroup.add(hull, bow, stripe, deck, bridge, this.shipContainersGroup);
     harborZone.add(this.shipGroup);
@@ -884,9 +933,9 @@ export class WorldScene {
       if (child instanceof THREE.Mesh) child.geometry.dispose();
     }
 
-    const cW = 2.4;
-    const cH = 1.1;
-    const cL = 1.6;
+    const cW = 2.2;
+    const cH = 1.05;
+    const cL = 1.5;
     const geo = new THREE.BoxGeometry(cW, cH, cL);
     const colors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0xa855f7];
 
@@ -894,15 +943,25 @@ export class WorldScene {
     const maxC = Math.min(cols, 4);
 
     for (let r = 0; r < maxR; r++) {
-      const z = (r - (maxR - 1) / 2) * (cL + 0.3);
+      // Longitudinal spacing with 0.4 gap
+      const z = (r - (maxR - 1) / 2) * (cL + 0.4);
       for (let c = 0; c < maxC; c++) {
-        const x = (c % 2 === 0 ? -1.4 : 1.4);
-        const y = Math.floor(c / 2) * (cH + 0.1) + cH / 2;
+        // Lateral stacks separated with 0.7 gap between port and starboard
+        const x = (c % 2 === 0 ? -1.45 : 1.45);
+        // Vertical tiers separated by 0.1 gap
+        const y = Math.floor(c / 2) * (cH + 0.12) + cH / 2;
         const cont = new THREE.Mesh(
           geo,
-          new THREE.MeshStandardMaterial({ color: colors[(r * 3 + c) % colors.length], roughness: 0.4 })
+          new THREE.MeshStandardMaterial({
+            color: colors[(r * 3 + c) % colors.length],
+            roughness: 0.45,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+          })
         );
         cont.position.set(x, y, z);
+        cont.castShadow = !this.isSoftwareGl;
         this.shipContainersGroup.add(cont);
       }
     }
@@ -977,20 +1036,43 @@ export class WorldScene {
     });
   }
 
-  // Camera presets for each stage
+  // Camera presets for each stage (with aspect-aware framing for mobile screens)
   public glideToStage(stage: TaskStage) {
+    this.currentStage = stage;
+    const isMobile = this.camera.aspect < 1.0;
+
     if (stage === 'godown') {
-      this.targetCamPos.set(-25, 9, 18);
-      this.targetLookAt.set(-22, 2, 6);
+      if (isMobile) {
+        this.targetCamPos.set(-23, 14, 25);
+        this.targetLookAt.set(-21, 2.5, 6);
+      } else {
+        this.targetCamPos.set(-25, 9, 18);
+        this.targetLookAt.set(-22, 2, 6);
+      }
     } else if (stage === 'station') {
-      this.targetCamPos.set(-4, 9, 16);
-      this.targetLookAt.set(-4, 2, 3);
+      if (isMobile) {
+        this.targetCamPos.set(-4, 14, 24);
+        this.targetLookAt.set(-4, 2.5, 3.5);
+      } else {
+        this.targetCamPos.set(-4, 9, 16);
+        this.targetLookAt.set(-4, 2, 3);
+      }
     } else if (stage === 'forklift') {
-      this.targetCamPos.set(15, 9, 16);
-      this.targetLookAt.set(17, 2, 3.5);
+      if (isMobile) {
+        this.targetCamPos.set(16, 14, 24);
+        this.targetLookAt.set(17, 2.5, 3.5);
+      } else {
+        this.targetCamPos.set(15, 9, 16);
+        this.targetLookAt.set(17, 2, 3.5);
+      }
     } else if (stage === 'harbor') {
-      this.targetCamPos.set(28, 11, 23);
-      this.targetLookAt.set(28, 3.5, 0);
+      if (isMobile) {
+        this.targetCamPos.set(30, 17, 32);
+        this.targetLookAt.set(34, 4.0, 1);
+      } else {
+        this.targetCamPos.set(28, 11, 23);
+        this.targetLookAt.set(28, 3.5, 0);
+      }
     }
   }
 
@@ -1102,9 +1184,15 @@ export class WorldScene {
               w.rotation.x += wheelSpeed;
             });
 
-            // Camera glides straight alongside the truck
-            this.targetCamPos.set(currentX, 9, 18);
-            this.targetLookAt.set(currentX, 2, this.ROAD_Z);
+            // Camera glides straight alongside the truck with mobile elevation
+            const isMobile = this.camera.aspect < 1.0;
+            if (isMobile) {
+              this.targetCamPos.set(currentX, 14, 25);
+              this.targetLookAt.set(currentX, 2.5, this.ROAD_Z);
+            } else {
+              this.targetCamPos.set(currentX, 9, 18);
+              this.targetLookAt.set(currentX, 2, this.ROAD_Z);
+            }
           }
         } else if (this.activeProcessStage === 'station') {
           // STEP 2: RAILWAY STATION - TRUCK TO TRAIN, TRAIN ROLLS TO FREIGHT YARD
@@ -1132,8 +1220,14 @@ export class WorldScene {
             });
 
             // Camera tracks the train steaming down tracks
-            this.targetCamPos.set(currentX, 9, 16);
-            this.targetLookAt.set(currentX, 2, this.RAIL_Z);
+            const isMobile = this.camera.aspect < 1.0;
+            if (isMobile) {
+              this.targetCamPos.set(currentX, 14, 24);
+              this.targetLookAt.set(currentX, 2.5, this.RAIL_Z);
+            } else {
+              this.targetCamPos.set(currentX, 9, 16);
+              this.targetLookAt.set(currentX, 2, this.RAIL_Z);
+            }
           }
         } else if (this.activeProcessStage === 'forklift') {
           // STEP 3: FREIGHT YARD - FORKLIFT TAKES TIME, LOADS GOODS INTO CONTAINER
@@ -1173,8 +1267,14 @@ export class WorldScene {
             this.forkliftWheels.forEach((w) => {
               w.rotation.x += delta * 14;
             });
-            this.targetCamPos.set(16 + tP * 2, 8.5, 14);
-            this.targetLookAt.set(17 + tP * 2, 2, 2.0);
+            const isMobile = this.camera.aspect < 1.0;
+            if (isMobile) {
+              this.targetCamPos.set(16 + tP * 2, 13, 22);
+              this.targetLookAt.set(17 + tP * 2, 2.5, 2.0);
+            } else {
+              this.targetCamPos.set(16 + tP * 2, 8.5, 14);
+              this.targetLookAt.set(17 + tP * 2, 2, 2.0);
+            }
           } else {
             // Pallet placed inside container, forklift backs up smoothly in clear view
             const tP = (subP - 0.85) / 0.15;
@@ -1192,24 +1292,34 @@ export class WorldScene {
           }
         } else if (this.activeProcessStage === 'harbor') {
           // STEP 4: HARBOR CRANE - CONTAINER TO SHIP
-          if (p < 0.3) {
-            const subP = p / 0.3;
-            this.onProcessProgressCb?.('Gantry crane aligns over the quay and lowers its spreader...', percent);
+          const isMobile = this.camera.aspect < 1.0;
+          if (p < 0.25) {
+            const subP = p / 0.25;
+            this.onProcessProgressCb?.('Gantry crane spreader lowering to lock onto quay container...', percent);
             if (this.craneTrolley) this.craneTrolley.position.x = 0;
-            if (this.craneSpreader) this.craneSpreader.position.y = -4 - subP * 3.5;
-          } else if (p < 0.6) {
-            const subP = (p - 0.3) / 0.3;
-            this.onProcessProgressCb?.('Hoisting the container high into the air...', percent);
-            if (this.craneSpreader) this.craneSpreader.position.y = -7.5 + subP * 5.5; // Up to -2
-            if (this.craneTrolley) this.craneTrolley.position.x = subP * 8; // Glide over ship
-          } else if (p < 0.88) {
-            const subP = (p - 0.6) / 0.28;
-            this.onProcessProgressCb?.('Lowering container deep into the cargo vessel hold...', percent);
-            if (this.craneTrolley) this.craneTrolley.position.x = 8;
-            if (this.craneSpreader) this.craneSpreader.position.y = -2 - subP * 3.5;
+            if (this.craneSpreader) this.craneSpreader.position.y = -4 - subP * 4.5;
+          } else if (p < 0.65) {
+            const subP = (p - 0.25) / 0.40;
+            this.onProcessProgressCb?.('Hoisting container high and gliding over the cargo ship hold...', percent);
+            if (this.craneSpreader) this.craneSpreader.position.y = -8.5 + subP * 5.5; // Up to -3
+            if (this.craneTrolley) this.craneTrolley.position.x = subP * 16.0; // Glide all the way to ship at x = 16!
+
+            if (isMobile) {
+              this.targetCamPos.set(28 + subP * 4, 17, 32);
+              this.targetLookAt.set(28 + subP * 4, 4.0, 0);
+            } else {
+              this.targetCamPos.set(28 + subP * 4, 11, 23);
+              this.targetLookAt.set(28 + subP * 4, 3.5, 0);
+            }
+          } else if (p < 0.90) {
+            const subP = (p - 0.65) / 0.25;
+            this.onProcessProgressCb?.('Lowering container directly into the cargo vessel cell hold...', percent);
+            if (this.craneTrolley) this.craneTrolley.position.x = 16.0;
+            if (this.craneSpreader) this.craneSpreader.position.y = -3.0 - subP * 4.5; // Lowers into ship hold
           } else {
             this.onProcessProgressCb?.('Vessel fully battened down and ready to sail overseas!', percent);
-            if (this.craneSpreader) this.craneSpreader.position.y = -3.5;
+            if (this.craneTrolley) this.craneTrolley.position.x = 16.0;
+            if (this.craneSpreader) this.craneSpreader.position.y = -4.0;
           }
         }
 
@@ -1245,7 +1355,12 @@ export class WorldScene {
           this.shipGroup.rotation.z = Math.sin(time * 1.5) * 0.025;
           this.shipGroup.rotation.x = Math.cos(time * 1.2) * 0.015;
 
-          this.targetCamPos.set(16 + (this.shipGroup.position.x - 16) * 0.4, 20, 36 + this.shipGroup.position.z * 0.35);
+          const isMobile = this.camera.aspect < 1.0;
+          this.targetCamPos.set(
+            16 + (this.shipGroup.position.x - 16) * 0.4,
+            isMobile ? 22 : 20,
+            (isMobile ? 42 : 36) + this.shipGroup.position.z * 0.35
+          );
           this.targetLookAt.set(this.shipGroup.position.x, 2, this.shipGroup.position.z);
         } else if (!this.activeProcessStage) {
           this.shipGroup.position.y = -0.2 + Math.sin(this.shipBobTime * 1.2) * 0.15;
@@ -1272,12 +1387,8 @@ export class WorldScene {
   }
 
   private onResize = () => {
-    if (!this.container) return;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
+    this.updateCamera();
+    this.glideToStage(this.currentStage);
   };
 
   public dispose() {

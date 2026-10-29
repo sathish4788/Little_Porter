@@ -212,7 +212,7 @@ export default function App() {
       <GlobalAudioToggle />
 
       {/* 3. Top HUD Overlay */}
-      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-auto pr-36 sm:pr-40">
+      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-auto pr-14 sm:pr-36">
         <GameHUD
           currentStage={stage}
           onSelectStage={handleSelectStage}

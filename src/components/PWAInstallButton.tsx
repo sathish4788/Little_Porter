@@ -108,30 +108,52 @@ export const PWAInstallButton: React.FC = () => {
         </div>
       )}
 
-      {/* iOS Safari / Manual Installation Helper Guide */}
+      {/* Device-Adaptive Installation Helper Guide */}
       {showIOSGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border-4 border-sky-300 text-center">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border-4 border-sky-300 text-center animate-in fade-in zoom-in-95">
             <div className="w-14 h-14 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <Smartphone className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-black text-slate-900 mb-2">
-              Install on iPad / Phone
+            <h3 className="text-lg font-black text-slate-900 mb-1">
+              Install Little Port Manager
             </h3>
-            <div className="text-left bg-sky-50 p-4 rounded-2xl mb-4 text-xs sm:text-sm font-semibold text-slate-700 space-y-2">
-              <p className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                <span>In Safari/Chrome, tap the <strong>Share</strong> or <strong>Menu (⋮)</strong> button.</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
-                <span>Select <strong>"Add to Home Screen"</strong> or <strong>"Install App"</strong>.</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                <span>Open the game from your home screen for full-screen 3D fun!</span>
-              </p>
-            </div>
+            <p className="text-xs text-slate-500 font-semibold mb-3">
+              Play offline anytime on your home screen!
+            </p>
+
+            {isIOS ? (
+              <div className="text-left bg-sky-50 p-4 rounded-2xl mb-4 text-xs sm:text-sm font-semibold text-slate-700 space-y-2">
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                  <span>In Safari, tap the <strong>Share</strong> button (box with upward arrow) at the bottom toolbar.</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                  <span>Scroll down and tap <strong>"Add to Home Screen"</strong>.</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                  <span>Tap <strong>Add</strong> in the top right corner. Done!</span>
+                </p>
+              </div>
+            ) : (
+              <div className="text-left bg-sky-50 p-4 rounded-2xl mb-4 text-xs sm:text-sm font-semibold text-slate-700 space-y-2">
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                  <span>Tap the Chrome menu <strong>(three dots ⋮)</strong> in the top right.</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                  <span>Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                  <span>Tap <strong>Install</strong> when prompted to start playing as an app!</span>
+                </p>
+              </div>
+            )}
+
             <button
               onClick={() => setShowIOSGuide(false)}
               className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-bold cursor-pointer transition"
